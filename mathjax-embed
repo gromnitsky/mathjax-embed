@@ -1,29 +1,28 @@
 #!/usr/bin/env phantomjs
-// -*- js -*-
 /* globals MathJax, callPhantom */
+'use strict';
 
 var fs = require('fs')
 var sys = require('system')
 
-var errx = function(msg, noexit) {
-    sys.stderr.writeLine(sys.args[0] + ' error: ' + msg)
-    if (!noexit) {
-	if (typeof conf) log(0, false, "EXIT")
-	phantom.exit(1)
-    }
+var meta = require('./package.json')
+var sprint = require('sprint').sprint
+var optparse = require('optparse')
+
+var errx = function() {
+    var args = Array.prototype.slice.call(arguments, 0)
+    sys.stderr.writeLine(conf.__filename + ': ' + sprint.apply(this, args))
+    log(1, false, "EXIT")
+    phantom.exit(1)
 }
 
 phantom.onError = function(msg, trace) {
-    errx(msg, true)
+    sys.stderr.writeLine(sys.args[0] + ': ' + msg)
     trace.forEach(function(item) {
 	sys.stderr.writeLine("\t" + item.file + ': ' + item.line)
     })
     phantom.exit(70)
 }
-
-var meta = require('./package.json')
-var optparse = require('optparse')
-var sprint = require('sprint').sprint
 
 var conf = {
     __filename: sys.args[0].split(fs.separator).slice(-1)[0],
@@ -43,10 +42,18 @@ var conf = {
     exit: true
 }
 
-var log = function(level, deep, obj) {
+var log = function(level, deep) {
     if (conf.verbose < level) return
-    var s = deep ? JSON.stringify(obj, null, '  ') : obj
-    sys.stderr.write(conf.__filename + ': ' + s + "\n")
+    var args = Array.prototype.slice.call(arguments, 2)
+    if (deep) {
+	args.forEach(function(idx) {
+	    sys.stderr.write(conf.__filename + ': ' +
+			     JSON.stringify(idx, null, '  ') + "\n")
+	})
+	return
+    }
+    sys.stderr.write(conf.__filename + ': ' +
+		     sprint.apply(this, args) + "\n")
 }
 
 var version = function() {
@@ -68,6 +75,9 @@ var parse_opt = function(arr) {
 
     var parser = new optparse.OptionParser(switches)
     parser.banner = 'Usage: ' + conf.__filename + ' [options] file.html'
+    var missing_arg = function(name, val) {
+	if (!val) errx('--%s: missing argument', name)
+    }
 
     parser.on('help', function() {
 	console.log(parser)
@@ -83,29 +93,29 @@ var parse_opt = function(arr) {
 
     parser.on('noexit', function() { conf.exit = false })
 
-    parser.on('conf', function(unused, val) {
-	if (!val) errx('-c: missing argument')
+    parser.on('conf', function(name, val) {
+	missing_arg(name, val)
 	conf.mathjax.config = val
     })
 
-    parser.on('dir', function(unused, val) {
-	if (!val) errx('-d: missing argument')
+    parser.on('dir', function(name, val) {
+	missing_arg(name, val)
 	conf.mathjax.dir = val
     })
 
-    parser.on('filters', function(unused, val) {
+    parser.on('filters', function(name, val) {
 	if (!val) {
 	    conf.filters = []
 	    return
 	}
 	conf.filters = val.split(',').map(function(idx) {
 	    var r = idx.trim()
-	    if (r === "") errx("-f: invalid filter name")
+	    if (r === "") errx("--%s: empty filter name", name)
 	    return r
 	})
     })
 
-    parser.on(function(opt) { errx("unknown option: " + opt) })
+    parser.on(function(name) { errx("unknown option: `%s`", name) })
 
     return {
 	args: parser.parse(sys.args).slice(1),
@@ -156,18 +166,18 @@ var render = function(input) {
     })
 
     page.onConsoleMessage = function(msg) {
-	log(1, false, 'console: ' + msg)
+	log(1, false, 'console.log: %s', msg)
     }
 
     page.onError = function(msg, trace) {
-	log(1, false, 'JS error: ' + msg)
+	log(1, false, 'JS error: %s', msg)
 	trace.forEach(function(item) {
 	    log(1, true, item)
 	})
     }
 
     page.onResourceError = function(resourceError) {
-	errx(resourceError.errorCode + ': ' + resourceError.errorString)
+	errx("code %s: %s", resourceError.errorCode, resourceError.errorString)
     }
 
     var file = conf.mathjax.dir + '/MathJax.js'
@@ -208,7 +218,7 @@ var render = function(input) {
     page.onCallback = function(data) {
 	if (data.status === "done") {
 	    page_filter(page, {mathjax_js: file})
-	    console.log(page.content)
+	    sys.stdout.write(page.content)
 	    if (conf.exit) phantom.exit(0)
 	} else {
 	    log(1, false, data.msg)
@@ -218,10 +228,10 @@ var render = function(input) {
 
 var page_filter = function(page, opt) {
     conf.filters.forEach(function(idx) {
-	log(1, false, "filter: " + idx)
+	log(1, false, "filter: %s", idx)
 
 	var func = filters[idx]
-	if (typeof func !== "function") errx("invalid filter name: " + idx)
+	if (typeof func !== "function") errx("invalid filter name: %s", idx)
 	page.evaluate(function(func, opt) {
 	    func.call(this, opt)
 	}, func, opt)
