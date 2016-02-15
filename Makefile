@@ -1,7 +1,20 @@
+.DELETE_ON_ERROR:
+
+pp-%:
+	@echo "$(strip $($*))" | tr ' ' \\n
+
 %.html: %.md
 	pandoc -s -f markdown-tex_math_dollars+tex_math_double_backslash -t html5 $< -o $@
 
-test.html := $(patsubst %.md, %.html, $(wildcard test/data/*.md))
+%.mathjax.html: %.html
+	./mathjax-embed $< > $@
 
-.PHONY: test-compile
-test-compile: $(test.html)
+test.html := $(patsubst %.md, %.html, $(wildcard test/data/*.md))
+test.mathjax.html := $(patsubst %.html, %.mathjax.html, $(test.html))
+
+.PHONY: test
+test: $(test.html) $(test.mathjax.html)
+
+.PHONY: clean
+clean:
+	rm $(test.mathjax.html) $(test.html)
