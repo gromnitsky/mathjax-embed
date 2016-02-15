@@ -1,4 +1,4 @@
-# Pandoc MathJax Self-Contained
+# Pandoc MathJax Self-Contained Example
 
 ## The Lorenz Equations
 
