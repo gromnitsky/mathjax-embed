@@ -1,5 +1,6 @@
 #!/usr/bin/env phantomjs
 // -*- js -*-
+/* globals MathJax, callPhantom */
 
 var fs = require('fs')
 var sys = require('system')
@@ -7,7 +8,7 @@ var sys = require('system')
 var errx = function(msg, noexit) {
     sys.stderr.writeLine(sys.args[0] + ' error: ' + msg)
     if (!noexit) {
-	log(0, false, "*** EXIT ***")
+	log(0, false, "EXIT")
 	phantom.exit(1)
     }
 }
@@ -25,6 +26,7 @@ var optparse = require('optparse')
 var sprint = require('sprint').sprint
 
 var conf = {
+    __filename: sys.args[0].split(fs.separator).slice(-1)[0],
     verbose: 0,
     mathjax: {
 	config: function() {
@@ -44,7 +46,7 @@ var conf = {
 var log = function(level, deep, obj) {
     if (conf.verbose < level) return
     var s = deep ? JSON.stringify(obj, null, '  ') : obj
-    sys.stderr.write(s + "\n")
+    sys.stderr.write(conf.__filename + ': ' + s + "\n")
 }
 
 var version = function() {
@@ -57,14 +59,14 @@ var parse_opt = function(arr) {
     var switches = [
 	['-h', '--help', 'This text'],
 	['-V', '--version', 'Print version number'],
-	['-c', '--conf FILE', 'Use a custom .js mathjax config'],
+	['-c', '--conf FILE', 'Use a custom .js mathjax config'], // TODO
 	['-d', '--dir DIR', 'mathjax source directory'],
 	['-v', '--verbose', '(debug) Increase verbosity level'],
 	['-x', '--noexit', '(debug) Do not exit after rendering']
     ]
 
     var parser = new optparse.OptionParser(switches)
-    parser.banner = 'Usage: ' + sys.args[0] + ' [options] file.html'
+    parser.banner = 'Usage: ' + conf.__filename + ' [options] file.html'
 
     parser.on('help', function() {
 	console.log(parser)
@@ -123,11 +125,11 @@ var filters = {
 
 	pandoc_math_cleanup()
     },
-    "script-rm-config": function(path) {
-	var n = document.querySelector(sprint('script[src="%s"]', path))
+    "script-rm-config": function(opt) {
+	var n = document.querySelector('script[src="'+opt.mathjax_js+'"]')
 	n.parentNode.removeChild(n)
     },
-    "mathjax-rm-message": function(path) {
+    "mathjax-rm-message": function() {
 	var n = document.querySelector('#MathJax_Message')
 	n.parentNode.removeChild(n)
     }
@@ -165,26 +167,26 @@ var render = function(input) {
 	    page.evaluate(function() {
 
 		// FIXME: find a suitable hook
-		window.MathJax.Ajax.Require_orig_qIY4mDpe = window.MathJax.Ajax.Require
-		window.MathJax.Ajax.Require = function(url, cb) {
-		    window.callPhantom({ status: 'log',
-					 msg: "MathJax.Ajax.Require: " + url})
-		    return window.MathJax.Ajax.Require_orig_qIY4mDpe(url, cb)
+		MathJax.Ajax.Require_orig_qIY4mDpe = MathJax.Ajax.Require
+		MathJax.Ajax.Require = function(url, cb) {
+		    callPhantom({ status: 'log',
+				  msg: "MathJax.Ajax.Require: " + url})
+		    return MathJax.Ajax.Require_orig_qIY4mDpe(url, cb)
 		}
 
 		// notify PhantomJS when TeX rendering is finished
-		window.MathJax.Hub.Queue(function() {
-		    window.callPhantom({ status: 'log', msg: "we're done here"})
-		    window.callPhantom({ status: 'done' })
+		MathJax.Hub.Queue(function() {
+		    callPhantom({ status: 'log', msg: "we're done here"})
+		    callPhantom({ status: 'done' })
 		})
 
-		window.MathJax.Hub.Startup.signal.Interest(function(msg) {
-		    window.callPhantom({ status: 'log',
-					 msg: "mathjax startup: " + msg})
+		MathJax.Hub.Startup.signal.Interest(function(msg) {
+		    callPhantom({ status: 'log',
+				  msg: "mathjax: startup: " + msg})
 		})
-		window.MathJax.Hub.signal.Interest(function(msg) {
-		    window.callPhantom({ status: 'log',
-					 msg: "mathjax hub: " + msg})
+		MathJax.Hub.signal.Interest(function(msg) {
+		    callPhantom({ status: 'log',
+				  msg: "mathjax: hub: " + msg})
 		})
 	    })
 	})
@@ -192,7 +194,7 @@ var render = function(input) {
 
     page.onCallback = function(data) {
 	if (data.status === "done") {
-	    page_filter(page, filters)
+	    page_filter(page, {mathjax_js: file})
 	    console.log(page.content)
 	    if (conf.exit) phantom.exit(0)
 	} else {
@@ -201,8 +203,16 @@ var render = function(input) {
     }
 }
 
-var page_filter = function(page, filters) {
+var page_filter = function(page, opt) {
+    conf.filters.forEach(function(idx) {
+	log(1, false, "filter: " + idx)
 
+	var func = filters[idx]
+	if (typeof func !== "function") errx("invalid filter name: " + idx)
+	page.evaluate(function(func, opt) {
+	    func.call(this, opt)
+	}, func, opt)
+    })
 }
 
 var opt = parse_opt(sys.args)
