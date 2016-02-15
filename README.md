@@ -26,7 +26,7 @@ from npm.
 
 ~~~
 $ mathjax-embed
-Usage: mathjax-embed [options] file.html
+Usage: mathjax-embed [options] [file.html]
 
 Available options:
   -h, --help           This text

@@ -11,7 +11,8 @@ var optparse = require('optparse')
 
 var errx = function() {
     var args = Array.prototype.slice.call(arguments, 0)
-    sys.stderr.writeLine(conf.__filename + ': ' + sprint.apply(this, args))
+    sys.stderr.writeLine(conf.__filename +
+			 ' error: ' + sprint.apply(this, args))
     log(1, false, "EXIT")
     phantom.exit(1)
 }
@@ -74,7 +75,7 @@ var parse_opt = function(arr) {
     ]
 
     var parser = new optparse.OptionParser(switches)
-    parser.banner = 'Usage: ' + conf.__filename + ' [options] file.html'
+    parser.banner = 'Usage: ' + conf.__filename + ' [options] [file.html]'
     var missing_arg = function(name, val) {
 	if (!val) errx('--%s: missing argument', name)
     }
@@ -160,10 +161,7 @@ var filters = {
 
 var render = function(input) {
     var page = new WebPage()
-    page.open(input, function(status) {
-	if (status !== "success") errx(sprint('failed to parse `%s`', input))
-	log(1, false, "page.open()")
-    })
+    page.setContent(input, "file:///omglol.html")
 
     page.onConsoleMessage = function(msg) {
 	log(1, false, 'console.log: %s', msg)
@@ -239,7 +237,7 @@ var page_filter = function(page, opt) {
 }
 
 var page_inject_mathjax_config = function(page) {
-    log(1, false, "page_inject_config()")
+    log(1, false, "page_inject_mathjax_config()")
 
     if (typeof conf.mathjax.config === "function") {
 	page.evaluate(conf.mathjax.config)
@@ -254,12 +252,13 @@ var page_inject_mathjax_config = function(page) {
 // Main
 
 var opt = parse_opt(sys.args)
-if (opt.args.length === 0) {
-    console.log(opt.parser)
-    phantom.exit(1)
+var input
+try {
+    input = opt.args[0] ? fs.read(opt.args[0]) : sys.stdin.read()
+} catch (e) {
+    errx(e)
 }
 
 log(2, true, conf)
-log(2, false, opt.args[0])
 
-render(opt.args[0])
+render(input)
