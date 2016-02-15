@@ -8,7 +8,7 @@ var sys = require('system')
 var errx = function(msg, noexit) {
     sys.stderr.writeLine(sys.args[0] + ' error: ' + msg)
     if (!noexit) {
-	log(0, false, "EXIT")
+	if (typeof conf) log(0, false, "EXIT")
 	phantom.exit(1)
     }
 }
@@ -59,8 +59,9 @@ var parse_opt = function(arr) {
     var switches = [
 	['-h', '--help', 'This text'],
 	['-V', '--version', 'Print version number'],
-	['-c', '--conf FILE', 'Use a custom .js mathjax config'], // TODO
-	['-d', '--dir DIR', 'mathjax source directory'],
+	['-c', '--conf FILE', 'Use a custom .js mathjax config'],
+	['-d', '--dir DIR', 'Mathjax source directory. Default: ' + conf.mathjax.dir],
+	['-f', '--filters LIST', 'A comma-separated list of filters that is applied after mathjax rendering. Use empty string "" to disable all. Default: ' + conf.filters],
 	['-v', '--verbose', '(debug) Increase verbosity level'],
 	['-x', '--noexit', '(debug) Do not exit after rendering']
     ]
@@ -83,13 +84,25 @@ var parse_opt = function(arr) {
     parser.on('noexit', function() { conf.exit = false })
 
     parser.on('conf', function(unused, val) {
-	if (!val) errx('--conf: missing argument')
+	if (!val) errx('-c: missing argument')
 	conf.mathjax.config = val
     })
 
     parser.on('dir', function(unused, val) {
-	if (!val) errx('--conf: missing argument')
+	if (!val) errx('-d: missing argument')
 	conf.mathjax.dir = val
+    })
+
+    parser.on('filters', function(unused, val) {
+	if (!val) {
+	    conf.filters = []
+	    return
+	}
+	conf.filters = val.split(',').map(function(idx) {
+	    var r = idx.trim()
+	    if (r === "") errx("-f: invalid filter name")
+	    return r
+	})
     })
 
     parser.on(function(opt) { errx("unknown option: " + opt) })
@@ -138,7 +151,7 @@ var filters = {
 var render = function(input) {
     var page = new WebPage()
     page.open(input, function(status) {
-	if (status !== "success") errx(sprint('fail to parse `%s`', input))
+	if (status !== "success") errx(sprint('failed to parse `%s`', input))
 	log(1, false, "page.open()")
     })
 
@@ -147,7 +160,7 @@ var render = function(input) {
     }
 
     page.onError = function(msg, trace) {
-	log(1, false, msg)
+	log(1, false, 'JS error: ' + msg)
 	trace.forEach(function(item) {
 	    log(1, true, item)
 	})
@@ -161,7 +174,7 @@ var render = function(input) {
     page.onLoadFinished = function() {
 	log(1, false, "onLoadFinished()")
 
-	page.evaluate(conf.mathjax.config)
+	page_inject_mathjax_config(page)
 
 	page.includeJs(file, function() {
 	    page.evaluate(function() {
@@ -214,6 +227,21 @@ var page_filter = function(page, opt) {
 	}, func, opt)
     })
 }
+
+var page_inject_mathjax_config = function(page) {
+    log(1, false, "page_inject_config()")
+
+    if (typeof conf.mathjax.config === "function") {
+	page.evaluate(conf.mathjax.config)
+	return
+    }
+
+    page.evaluateJavaScript(sprint('function(){ %s; }',
+				   fs.read(conf.mathjax.config)))
+}
+
+
+// Main
 
 var opt = parse_opt(sys.args)
 if (opt.args.length === 0) {
