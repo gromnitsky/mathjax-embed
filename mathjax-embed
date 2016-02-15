@@ -33,7 +33,7 @@ var conf = {
 		showMathMenu: false,
 		extensions: ["tex2jax.js"],
 		tex2jax: { inlineMath: [["$","$"], ["\\(","\\)"]] },
-		jax: ["input/TeX", "output/HTML-CSS"]
+		jax: ["input/TeX", "output/SVG"]
 	    }
 	},
 	dir: phantom.libraryPath + '/node_modules/mathjax'

@@ -48,9 +48,13 @@ window.MathJax = {
 	showMathMenu: false,
 	extensions: ["tex2jax.js"],
 	tex2jax: { inlineMath: [["$","$"], ["\\(","\\)"]] },
-	jax: ["input/TeX", "output/HTML-CSS"]
+	jax: ["input/TeX", "output/SVG"]
 }
 ~~~
+
+By default mathjax-embed removes the surrounding `<br />` nodes round
+`<span class="math">` that pandoc inserts. If you don't like this, run
+mathjax-embed w/ `-f script-rm-config,mathjax-rm-message` option.
 
 ## Bugs
 
