@@ -1,0 +1,12 @@
+{
+  "name": "mathjax-embed",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Embed MathJax into HTML files",
+  "license": "MIT",
+  "dependencies": {
+    "mathjax": "^2.6.1",
+    "optparse": "~1.0.5",
+    "sprint": "~0.3.1"
+  }
+}

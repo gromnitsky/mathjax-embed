@@ -1,0 +1,217 @@
+#!/usr/bin/env phantomjs
+// -*- js -*-
+
+var fs = require('fs')
+var sys = require('system')
+
+var errx = function(msg, noexit) {
+    sys.stderr.writeLine(sys.args[0] + ' error: ' + msg)
+    if (!noexit) {
+	log(0, false, "*** EXIT ***")
+	phantom.exit(1)
+    }
+}
+
+phantom.onError = function(msg, trace) {
+    errx(msg, true)
+    trace.forEach(function(item) {
+	sys.stderr.writeLine("\t" + item.file + ': ' + item.line)
+    })
+    phantom.exit(70)
+}
+
+var meta = require('./package.json')
+var optparse = require('optparse')
+var sprint = require('sprint').sprint
+
+var conf = {
+    verbose: 0,
+    mathjax: {
+	config: function() {
+	    window.MathJax = {
+		showMathMenu: false,
+		extensions: ["tex2jax.js"],
+		tex2jax: { inlineMath: [["$","$"], ["\\(","\\)"]] },
+		jax: ["input/TeX", "output/HTML-CSS"]
+	    }
+	},
+	dir: phantom.libraryPath + '/node_modules/mathjax'
+    },
+    filters: ["pandoc-rm-br", "script-rm-config", "mathjax-rm-message"],
+    exit: true
+}
+
+var log = function(level, deep, obj) {
+    if (conf.verbose < level) return
+    var s = deep ? JSON.stringify(obj, null, '  ') : obj
+    sys.stderr.write(s + "\n")
+}
+
+var version = function() {
+    return sprint('%s/%s (%s; %s) phantomjs/%d.%d.%d', meta.name, meta.version,
+		  sys.os.name, sys.os.architecture,
+		  phantom.version.major, phantom.version.minor, phantom.version.patch)
+}
+
+var parse_opt = function(arr) {
+    var switches = [
+	['-h', '--help', 'This text'],
+	['-V', '--version', 'Print version number'],
+	['-c', '--conf FILE', 'Use a custom .js mathjax config'],
+	['-d', '--dir DIR', 'mathjax source directory'],
+	['-v', '--verbose', '(debug) Increase verbosity level'],
+	['-x', '--noexit', '(debug) Do not exit after rendering']
+    ]
+
+    var parser = new optparse.OptionParser(switches)
+    parser.banner = 'Usage: ' + sys.args[0] + ' [options] file.html'
+
+    parser.on('help', function() {
+	console.log(parser)
+	phantom.exit(0)
+    })
+
+    parser.on('version', function() {
+	console.log(version())
+	phantom.exit(0)
+    })
+
+    parser.on('verbose', function() { conf.verbose++ })
+
+    parser.on('noexit', function() { conf.exit = false })
+
+    parser.on('conf', function(unused, val) {
+	if (!val) errx('--conf: missing argument')
+	conf.mathjax.config = val
+    })
+
+    parser.on('dir', function(unused, val) {
+	if (!val) errx('--conf: missing argument')
+	conf.mathjax.dir = val
+    })
+
+    parser.on(function(opt) { errx("unknown option: " + opt) })
+
+    return {
+	args: parser.parse(sys.args).slice(1),
+	parser: parser
+    }
+}
+
+var filters = {
+    // remove annoying <br> tags that pandoc inserts before/after span
+    // w/ math
+    "pandoc-rm-br": function() {
+	var dom_nodes_delete = function(nodelist) {
+	    if (!nodelist) return
+	    // NodeList is not an array. All prase DOM!
+	    for (var idx = 0; idx < nodelist.length; ++idx) {
+		nodelist[idx].parentNode.removeChild(nodelist[idx])
+	    }
+	}
+
+	var pandoc_math_cleanup = function() {
+	    var span = document.querySelectorAll('br + span[class="math"]')
+	    var br1 = []
+	    for (var idx = 0; idx < span.length; ++idx)
+		br1.push(span[idx].previousSibling)
+	    dom_nodes_delete(br1)
+
+	    var br2 = document.querySelectorAll('span[class="math"] + br')
+	    dom_nodes_delete(br2)
+	}
+
+	pandoc_math_cleanup()
+    },
+    "script-rm-config": function(path) {
+	var n = document.querySelector(sprint('script[src="%s"]', path))
+	n.parentNode.removeChild(n)
+    },
+    "mathjax-rm-message": function(path) {
+	var n = document.querySelector('#MathJax_Message')
+	n.parentNode.removeChild(n)
+    }
+}
+
+var render = function(input) {
+    var page = new WebPage()
+    page.open(input, function(status) {
+	if (status !== "success") errx(sprint('fail to parse `%s`', input))
+	log(1, false, "page.open()")
+    })
+
+    page.onConsoleMessage = function(msg) {
+	log(1, false, 'console: ' + msg)
+    }
+
+    page.onError = function(msg, trace) {
+	log(1, false, msg)
+	trace.forEach(function(item) {
+	    log(1, true, item)
+	})
+    }
+
+    page.onResourceError = function(resourceError) {
+	errx(resourceError.errorCode + ': ' + resourceError.errorString)
+    }
+
+    var file = conf.mathjax.dir + '/MathJax.js'
+    page.onLoadFinished = function() {
+	log(1, false, "onLoadFinished()")
+
+	page.evaluate(conf.mathjax.config)
+
+	page.includeJs(file, function() {
+	    page.evaluate(function() {
+
+		// FIXME: find a suitable hook
+		window.MathJax.Ajax.Require_orig_qIY4mDpe = window.MathJax.Ajax.Require
+		window.MathJax.Ajax.Require = function(url, cb) {
+		    window.callPhantom({ status: 'log',
+					 msg: "MathJax.Ajax.Require: " + url})
+		    return window.MathJax.Ajax.Require_orig_qIY4mDpe(url, cb)
+		}
+
+		// notify PhantomJS when TeX rendering is finished
+		window.MathJax.Hub.Queue(function() {
+		    window.callPhantom({ status: 'log', msg: "we're done here"})
+		    window.callPhantom({ status: 'done' })
+		})
+
+		window.MathJax.Hub.Startup.signal.Interest(function(msg) {
+		    window.callPhantom({ status: 'log',
+					 msg: "mathjax startup: " + msg})
+		})
+		window.MathJax.Hub.signal.Interest(function(msg) {
+		    window.callPhantom({ status: 'log',
+					 msg: "mathjax hub: " + msg})
+		})
+	    })
+	})
+    }
+
+    page.onCallback = function(data) {
+	if (data.status === "done") {
+	    page_filter(page, filters)
+	    console.log(page.content)
+	    if (conf.exit) phantom.exit(0)
+	} else {
+	    log(1, false, data.msg)
+	}
+    }
+}
+
+var page_filter = function(page, filters) {
+
+}
+
+var opt = parse_opt(sys.args)
+if (opt.args.length === 0) {
+    console.log(opt.parser)
+    phantom.exit(1)
+}
+
+log(2, true, conf)
+log(2, false, opt.args[0])
+
+render(opt.args[0])
