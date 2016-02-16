@@ -5,7 +5,12 @@ embed anything, but renders the page in phantomjs & prints the result
 to stdout. For mathjax configs w/o menu it means that the resulting
 file to be displayed correctly **doesn't require JavaScript** at all.
 
-See `test/data/example01.mathjax.html`, for example.
+See
+[example01.mathjax.html](http://gromnitsky.users.sourceforge.net/articles/mathjax-embed/example01.mathjax.html),
+for example.
+
+Why don't use jsdom instead of phantomjs? jsdom is very slow for this
+task.
 
 ## Requirements
 
