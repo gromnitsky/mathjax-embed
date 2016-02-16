@@ -14,6 +14,7 @@ test.mathjax.html := $(patsubst %.html, %.mathjax.html, $(test.html))
 
 .PHONY: test
 test: $(test.html) $(test.mathjax.html)
+	node_modules/.bin/mocha -u tdd test/test_*.js $(TEST_OPT)
 
 .PHONY: clean
 clean:
