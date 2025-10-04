@@ -3,8 +3,8 @@ it doesn't embed anything, but renders the page in phantomjs & prints
 the result to stdout. For mathjax configs w/o menu this means the
 resulting file **doesn't require JavaScript** to render itself.
 
-**2025 update**: it's still a viable option if you target device
-doesn't support MathML.
+**2025 update**: the majorify of code was written in 2016, but it's
+still a viable option if you target device doesn't support MathML.
 
 ## Installation
 
@@ -30,10 +30,11 @@ doesn't support MathML.
 2. Clone the repo, run `npm i` to fetch the deps. Afterwards,
    *mathjax-embed* doesn't require node to run.
 
-3. Check
+3. Symlink `wrapper.sh` as `mathjax-embed` somewhere in PATH & check
+   it:
 
    ~~~
-   $ ./mathjax-embed -V
+   $ mathjax-embed -V
    mathjax-embed/1.0.0 (linux; 64bit) phantomjs/2.1.1
    ~~~
 
