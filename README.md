@@ -3,8 +3,9 @@ it doesn't embed anything, but renders the page in phantomjs & prints
 the result to stdout. For mathjax configs w/o menu this means the
 resulting file **doesn't require JavaScript** to render itself.
 
-**2025 update**: the majorify of code was written in 2016, but it's
-still a viable option if you target device doesn't support MathML.
+**2025 update**: the majorify of the code was written in 2016, but
+it's still a viable option if you target device doesn't support
+MathML.
 
 ## Installation
 
