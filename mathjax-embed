@@ -1,5 +1,5 @@
 #!/usr/bin/env phantomjs
-/* globals MathJax, callPhantom */
+/* globals MathJax, phantom, callPhantom, WebPage */
 'use strict';
 
 var fs = require('fs')
@@ -9,12 +9,17 @@ var meta = require('./package.json')
 var sprint = require('sprint').sprint
 var optparse = require('optparse')
 
+function exit(code) {
+    phantom.exit(code)
+    console.log('') // https://github.com/ariya/phantomjs/issues/13121
+}
+
 var errx = function() {
     var args = Array.prototype.slice.call(arguments, 0)
     sys.stderr.writeLine(conf.__filename +
 			 ' error: ' + sprint.apply(this, args))
     log(1, false, "EXIT")
-    phantom.exit(1)
+    exit(1)
 }
 
 phantom.onError = function(msg, trace) {
@@ -22,7 +27,23 @@ phantom.onError = function(msg, trace) {
     trace.forEach(function(item) {
 	sys.stderr.writeLine("\t" + item.file + ': ' + item.line)
     })
-    phantom.exit(70)
+    exit(70)
+}
+
+var filters = {
+    "script-rm-config": function(opt) {
+	var n = document.querySelector('script[src="'+opt.mathjax_js+'"]')
+	n.parentNode.removeChild(n)
+    },
+    "mathjax-rm-message": function() {
+	var n = document.querySelector('#MathJax_Message')
+	n.parentNode.removeChild(n)
+    },
+    "mathjax-rm-script": function() {
+        // pandoc 3.8.1
+        var n = document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"]')
+        n.parentNode.removeChild(n)
+    }
 }
 
 var conf = {
@@ -39,7 +60,7 @@ var conf = {
 	},
 	dir: phantom.libraryPath + '/node_modules/mathjax'
     },
-    filters: ["pandoc-rm-br", "script-rm-config", "mathjax-rm-message"],
+    filters: Object.keys(filters),
     exit: true
 }
 
@@ -82,12 +103,12 @@ var parse_opt = function(arr) {
 
     parser.on('help', function() {
 	console.log(parser)
-	phantom.exit(0)
+	exit(0)
     })
 
     parser.on('version', function() {
 	console.log(version())
-	phantom.exit(0)
+	exit(0)
     })
 
     parser.on('verbose', function() { conf.verbose++ })
@@ -119,43 +140,8 @@ var parse_opt = function(arr) {
     parser.on(function(name) { errx("unknown option: `%s`", name) })
 
     return {
-	args: parser.parse(sys.args).slice(1),
+	args: parser.parse(arr).slice(1),
 	parser: parser
-    }
-}
-
-var filters = {
-    // remove annoying <br> tags that pandoc inserts before/after span
-    // w/ math
-    "pandoc-rm-br": function() {
-	var dom_nodes_delete = function(nodelist) {
-	    if (!nodelist) return
-	    // NodeList is not an array. All prase DOM!
-	    for (var idx = 0; idx < nodelist.length; ++idx) {
-		nodelist[idx].parentNode.removeChild(nodelist[idx])
-	    }
-	}
-
-	var pandoc_math_cleanup = function() {
-	    var span = document.querySelectorAll('br + span[class="math"]')
-	    var br1 = []
-	    for (var idx = 0; idx < span.length; ++idx)
-		br1.push(span[idx].previousSibling)
-	    dom_nodes_delete(br1)
-
-	    var br2 = document.querySelectorAll('span[class="math"] + br')
-	    dom_nodes_delete(br2)
-	}
-
-	pandoc_math_cleanup()
-    },
-    "script-rm-config": function(opt) {
-	var n = document.querySelector('script[src="'+opt.mathjax_js+'"]')
-	n.parentNode.removeChild(n)
-    },
-    "mathjax-rm-message": function() {
-	var n = document.querySelector('#MathJax_Message')
-	n.parentNode.removeChild(n)
     }
 }
 
@@ -217,7 +203,7 @@ var render = function(input) {
 	if (data.status === "done") {
 	    page_filter(page, {mathjax_js: file})
 	    sys.stdout.write(page.content)
-	    if (conf.exit) phantom.exit(0)
+	    if (conf.exit) exit(0)
 	} else {
 	    log(1, false, data.msg)
 	}

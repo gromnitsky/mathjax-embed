@@ -1,50 +1,56 @@
-# mathjax-embed
+A quick hack to "embed" MathJax into an html file as SVGs. Actually,
+it doesn't embed anything, but renders the page in phantomjs & prints
+the result to stdout. For mathjax configs w/o menu this means the
+resulting file **doesn't require JavaScript** to render itself.
 
-A quick hack to "embed" mathjax into a html file. Actually it doesn't
-embed anything, but renders the page in phantomjs & prints the result
-to stdout. For mathjax configs w/o menu it means that the resulting
-file to be displayed correctly **doesn't require JavaScript** at all.
-
-See
-[example01.mathjax.html](http://gromnitsky.users.sourceforge.net/articles/mathjax-embed/example01.mathjax.html),
-for example.
-
-Why don't use jsdom instead of phantomjs? jsdom is very slow for this
-task.
-
-## Requirements
-
-* phantomjs 2.1.1
-* nodejs 5.6.0
-
-mathjax-embed doesn't use nodejs, we just need it to pull several pkgs
-from npm.
+**2025 update**: it's still a viable option if you target device
+doesn't support MathML.
 
 ## Installation
 
-1. clone the repo in `$dir`
-2. chdir `$dir`
-3. run `npm install`
-4. **symlink** `$dir/mathjax-embed-wrapper.sh` to a dir in PATH as `mathjax-embed`
+1. Install phantomjs:
+
+   - Get a precompiled binary from https://phantomjs.org/download.html
+   - Create a shell script:
+
+     ~~~
+     cat ~/bin/phantomjs
+     #!/bin/sh
+     export OPENSSL_CONF=/etc/ssl
+     /path/to/phantomjs-2.1.1-linux-x86_64/bin/phantomjs "$@"
+     ~~~
+
+   - Make sure the script doesn't spit errors:
+
+     ~~~
+     $ phantomjs --version
+     2.1.1
+     ~~~
+
+2. Clone the repo, run `npm i` to fetch the deps. Afterwards,
+   *mathjax-embed* doesn't require node to run.
+
+3. Check
+
+   ~~~
+   $ ./mathjax-embed -V
+   mathjax-embed/1.0.0 (linux; 64bit) phantomjs/2.1.1
+   ~~~
 
 ## Usage
 
-~~~
-$ mathjax-embed
-Usage: mathjax-embed [options] [file.html]
+Convert an html chunk to a standalone html file:
 
-Available options:
-  -h, --help           This text
-  -V, --version        Print version number
-  -c, --conf FILE      Use a custom .js mathjax config
-  -d, --dir DIR        Mathjax source directory. Default: /home/alex/lib/\
-software/alex/phantomjs/mathjax-embed/node_modules/mathjax
-  -f, --filters LIST   A comma-separated list of filters that is applied \
-after mathjax rendering. Use empty string "" to disable all. Default:\
- pandoc-rm-br,script-rm-config,mathjax-rm-message
-  -v, --verbose        (debug) Increase verbosity level
-  -x, --noexit         (debug) Do not exit after rendering
-~~~
+    echo '<p>Function $y = \sin(x)$.</p>' | ./mathjax-embed > 1.html
+
+A markdown file with TeX formulas:
+
+    $ pandoc -s test/data/example02.md -t html --mathjax | ./mathjax-embed > 2.html
+
+In the default pandoc (3.8.1) configuration, the math delimiters are
+`$$...$$` for displayed mathematics, and `$...$` for in-line. To use
+`\\[...\\]` and `\\(...\\)` instead, give `-f
+markdown-tex_math_dollars+tex_math_double_backslash` option to pandoc.
 
 The default mathjax config (use `-c` CLO to provide your own):
 
@@ -57,13 +63,11 @@ window.MathJax = {
 }
 ~~~
 
-By default mathjax-embed removes the surrounding `<br />` nodes round
-`<span class="math">` that pandoc inserts. If you don't like this, run
-mathjax-embed w/ `-f script-rm-config,mathjax-rm-message` option.
-
 ## Bugs
 
-* Doesn't work under Windows
+* Depends on abandoned phantomjs.
+* Uses an ancient (2016-02-08) MathJax version.
+* Tested only on Fedora 42.
 
 ## License
 

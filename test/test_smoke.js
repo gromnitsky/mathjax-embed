@@ -1,6 +1,4 @@
-'use strict';
-
-let assert = require('assert')
+let assert = require('assert/strict')
 let fs = require('fs')
 let spawnSync = require('child_process').spawnSync
 
@@ -22,7 +20,11 @@ suite('smoke', function() {
     test('y=sin(x)', function () {
 	let r = spawnSync(this.cmd,  [], {input: '$y = \sin(x)$'})
 	let $ = cheerio.load(r.stdout.toString())
-	assert(1, $('svg').length)
+        assert.equal(2, $('svg').length)
+        let scripts = $('script')
+        assert.equal(1, scripts.length)
+        assert.equal('MathJax-Element-1', $('script')[0].attribs.id)
+        assert(!$('script')[0].attribs.src)
     })
 
     test('example01.html', function () {
@@ -30,6 +32,8 @@ suite('smoke', function() {
 	    input: fs.readFileSync('test/data/example01.html').toString()
 	})
 	let $ = cheerio.load(r.stdout.toString())
-	assert(9, $('svg').length)
+        assert.equal(11, $('svg').length)
+        assert.equal(10, $('script').length)
+        assert.equal(10, $('script[type*="math/tex"]').length)
     })
 })
