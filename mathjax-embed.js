@@ -161,8 +161,12 @@ var render = function(input) {
 	})
     }
 
-    page.onResourceError = function(resourceError) {
-	errx("code %s: %s", resourceError.errorCode, resourceError.errorString)
+    page.onResourceRequested = function(requestData, _networkRequest) {
+        log(1, false, '%s', requestData.url)
+    }
+
+    page.onResourceError = function(e) {
+        log(1, false, "code %s: %s", e.errorCode, e.errorString)
     }
 
     var file = conf.mathjax.dir + '/MathJax.js'
