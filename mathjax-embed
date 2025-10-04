@@ -41,7 +41,7 @@ var filters = {
     },
     "mathjax-rm-script": function() {
         // pandoc 3.8.1
-        var n = document.querySelector('script[src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"]')
+        var n = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
         n.parentNode.removeChild(n)
     }
 }
