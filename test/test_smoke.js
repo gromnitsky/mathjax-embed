@@ -6,7 +6,7 @@ let cheerio = require('cheerio')
 
 suite('smoke', function() {
     setup(function() {
-	this.cmd = './mathjax-embed'
+	this.cmd = './mathjax-embed.js'
     })
 
     test('empty', function () {

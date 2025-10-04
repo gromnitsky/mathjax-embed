@@ -42,11 +42,11 @@ still a viable option if you target device doesn't support MathML.
 
 Convert an html chunk to a standalone html file:
 
-    echo '<p>Function $y = \sin(x)$.</p>' | ./mathjax-embed > 1.html
+    echo '<p>Function $y = \sin(x)$.</p>' | mathjax-embed > 1.html
 
 A markdown file with TeX formulas:
 
-    $ pandoc -s test/data/example02.md -t html --mathjax | ./mathjax-embed > 2.html
+    $ pandoc -s test/data/example02.md -t html --mathjax | mathjax-embed > 2.html
 
 In the default pandoc (3.8.1) configuration, the math delimiters are
 `$$...$$` for displayed mathematics, and `$...$` for in-line. To use
