@@ -33,16 +33,17 @@ phantom.onError = function(msg, trace) {
 var filters = {
     "script-rm-config": function(opt) {
 	var n = document.querySelector('script[src="'+opt.mathjax_js+'"]')
-	n.parentNode.removeChild(n)
+        if (n) { n.parentNode.removeChild(n); return true; }
     },
     "mathjax-rm-message": function() {
 	var n = document.querySelector('#MathJax_Message')
-	n.parentNode.removeChild(n)
+        if (n) { n.parentNode.removeChild(n); return true; }
     },
     "mathjax-rm-script": function() {
-        // pandoc 3.8.1
+        // the url pandoc 3.8.1 injects with `--mathjax`.
+        // before 2019-10-10 it was cloudflare
         var n = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
-        n.parentNode.removeChild(n)
+        if (n) { n.parentNode.removeChild(n); return true; }
     }
 }
 
@@ -211,14 +212,16 @@ var render = function(input) {
 }
 
 var page_filter = function(page, opt) {
-    conf.filters.forEach(function(idx) {
-	log(1, false, "filter: %s", idx)
+    conf.filters.forEach(function(name) {
+        log(1, false, "filter: %s", name)
+        var func = filters[name]
+        if (typeof func !== "function") errx("invalid filter name: %s", name)
 
-	var func = filters[idx]
-	if (typeof func !== "function") errx("invalid filter name: %s", idx)
-	page.evaluate(function(func, opt) {
-	    func.call(this, opt)
-	}, func, opt)
+        if (!page.evaluate(function(func, opt) {
+            return func.call(this, opt)
+        }, func, opt)) {
+            log(1, false, "filter: %s: FAILED", name)
+        }
     })
 }
 
