@@ -1,0 +1,12 @@
+{
+    "loader": {
+        "load": ["input/tex", "output/svg"]
+    },
+    "tex": {
+        "inlineMath": [["$", "$"], ["\\(", "\\)"]]
+    },
+    "svg": {
+        "fontCache": "local",
+        "useXlink": true
+    }
+}

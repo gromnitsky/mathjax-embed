@@ -1,257 +1,101 @@
-#!/usr/bin/env phantomjs
-/* globals MathJax, phantom, callPhantom, WebPage */
-'use strict';
+#!/usr/bin/env node
 
-var fs = require('fs')
-var sys = require('system')
+import fs from 'fs'
+import { Script } from 'vm'
+import util from 'util'
+import os from 'os'
+import meta from './package.json' with { type: 'json' }
 
-var meta = require('./package.json')
-var sprint = require('sprint').sprint
-var optparse = require('optparse')
+import jsdom from 'jsdom'
+let {JSDOM} = jsdom
 
-function exit(code) {
-    phantom.exit(code)
-    console.log('') // https://github.com/ariya/phantomjs/issues/13121
-}
-
-var errx = function() {
-    var args = Array.prototype.slice.call(arguments, 0)
-    sys.stderr.writeLine(conf.__filename +
-			 ' error: ' + sprint.apply(this, args))
-    log(1, false, "EXIT")
-    exit(1)
-}
-
-phantom.onError = function(msg, trace) {
-    sys.stderr.writeLine(sys.args[0] + ': ' + msg)
-    trace.forEach(function(item) {
-	sys.stderr.writeLine("\t" + item.file + ': ' + item.line)
+function read(file) {
+    let stream = file ? fs.createReadStream(file) : process.stdin
+    let data = []
+    return new Promise( (resolve, reject) => {
+        stream.on('error', reject)
+        stream.on('data', chunk => data.push(chunk))
+        stream.on('end', () => resolve(data.join``))
     })
-    exit(70)
 }
 
-var filters = {
-    "script-rm-config": function(opt) {
-	var n = document.querySelector('script[src="'+opt.mathjax_js+'"]')
-        if (n) { n.parentNode.removeChild(n); return true; }
-    },
-    "mathjax-rm-message": function() {
-	var n = document.querySelector('#MathJax_Message')
-        if (n) { n.parentNode.removeChild(n); return true; }
-    },
-    "mathjax-rm-script": function() {
-        // the url pandoc 3.8.1 injects with `--mathjax`.
-        // before 2019-10-10 it was cloudflare
-        var n = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
-        if (n) { n.parentNode.removeChild(n); return true; }
-    }
+async function version() {
+    let v = name => import(`${name}/package.json`, { with: {type: 'json'} })
+        .then( p => p.default.version)
+    return util.format('%s/s (%s %s) mathjax/%s domjs/%s nodejs/%s',
+                       meta.name, meta.version, os.type(), os.machine(),
+                       await v('mathjax'), await v('jsdom'), process.version)
 }
 
-var conf = {
-    __filename: sys.args[0].split(fs.separator).slice(-1)[0],
-    verbose: 0,
-    mathjax: {
-	config: function() {
-	    window.MathJax = {
-		showMathMenu: false,
-		extensions: ["tex2jax.js"],
-		tex2jax: { inlineMath: [["$","$"], ["\\(","\\)"]] },
-		jax: ["input/TeX", "output/SVG"]
-	    }
-	},
-	dir: phantom.libraryPath + '/node_modules/mathjax'
-    },
-    filters: Object.keys(filters),
-    exit: true
+function log(...args) { if (process.env.V) console.error(...args) }
+
+let loader = await read(`${import.meta.dirname}/loader.js`)
+
+function cleanup(document) {
+    let s = Array.from(document.querySelectorAll(`script[src*="node_modules"]`))
+    let pandoc = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
+    if (pandoc) s.push(pandoc)
+    s.forEach( node => { node.parentNode.removeChild(node) })
 }
 
-var log = function(level, deep) {
-    if (conf.verbose < level) return
-    var args = Array.prototype.slice.call(arguments, 2)
-    if (deep) {
-	args.forEach(function(idx) {
-	    sys.stderr.write(conf.__filename + ': ' +
-			     JSON.stringify(idx, null, '  ') + "\n")
-	})
-	return
-    }
-    sys.stderr.write(conf.__filename + ': ' +
-		     sprint.apply(this, args) + "\n")
-}
-
-var version = function() {
-    return sprint('%s/%s (%s; %s) phantomjs/%d.%d.%d', meta.name, meta.version,
-		  sys.os.name, sys.os.architecture,
-		  phantom.version.major, phantom.version.minor, phantom.version.patch)
-}
-
-var parse_opt = function(arr) {
-    var switches = [
-	['-h', '--help', 'This text'],
-	['-V', '--version', 'Print version number'],
-	['-c', '--conf FILE', 'Use a custom .js mathjax config'],
-	['-d', '--dir DIR', 'Mathjax source directory. Default: ' + conf.mathjax.dir],
-	['-f', '--filters LIST', 'A comma-separated list of filters that is applied after mathjax rendering. Use empty string "" to disable all. Default: ' + conf.filters],
-	['-v', '--verbose', '(debug) Increase verbosity level'],
-	['-x', '--noexit', '(debug) Do not exit after rendering']
-    ]
-
-    var parser = new optparse.OptionParser(switches)
-    parser.banner = 'Usage: ' + conf.__filename + ' [options] [file.html]'
-    var missing_arg = function(name, val) {
-	if (!val) errx('--%s: missing argument', name)
-    }
-
-    parser.on('help', function() {
-	console.log(parser)
-	exit(0)
-    })
-
-    parser.on('version', function() {
-	console.log(version())
-	exit(0)
-    })
-
-    parser.on('verbose', function() { conf.verbose++ })
-
-    parser.on('noexit', function() { conf.exit = false })
-
-    parser.on('conf', function(name, val) {
-	missing_arg(name, val)
-	conf.mathjax.config = val
-    })
-
-    parser.on('dir', function(name, val) {
-	missing_arg(name, val)
-	conf.mathjax.dir = val
-    })
-
-    parser.on('filters', function(name, val) {
-	if (!val) {
-	    conf.filters = []
-	    return
-	}
-	conf.filters = val.split(',').map(function(idx) {
-	    var r = idx.trim()
-	    if (r === "") errx("--%s: empty filter name", name)
-	    return r
-	})
-    })
-
-    parser.on(function(name) { errx("unknown option: `%s`", name) })
-
-    return {
-	args: parser.parse(arr).slice(1),
-	parser: parser
-    }
-}
-
-var render = function(input) {
-    var page = new WebPage()
-    page.setContent(input, "file:///omglol.html")
-
-    page.onConsoleMessage = function(msg) {
-	log(1, false, 'console.log: %s', msg)
-    }
-
-    page.onError = function(msg, trace) {
-	log(1, false, 'JS error: %s', msg)
-	trace.forEach(function(item) {
-	    log(1, true, item)
-	})
-    }
-
-    page.onResourceRequested = function(requestData, _networkRequest) {
-        log(1, false, '%s', requestData.url)
-    }
-
-    page.onResourceError = function(e) {
-        log(1, false, "code %s: %s", e.errorCode, e.errorString)
-    }
-
-    var file = conf.mathjax.dir + '/MathJax.js'
-    page.onLoadFinished = function() {
-	log(1, false, "onLoadFinished()")
-
-	page_inject_mathjax_config(page)
-
-	page.includeJs(file, function() {
-	    page.evaluate(function() {
-
-		// FIXME: find a suitable hook
-		MathJax.Ajax.Require_orig_qIY4mDpe = MathJax.Ajax.Require
-		MathJax.Ajax.Require = function(url, cb) {
-		    callPhantom({ status: 'log',
-				  msg: "MathJax.Ajax.Require: " + url})
-		    return MathJax.Ajax.Require_orig_qIY4mDpe(url, cb)
-		}
-
-		// notify PhantomJS when TeX rendering is finished
-		MathJax.Hub.Queue(function() {
-		    callPhantom({ status: 'log', msg: "we're done here"})
-		    callPhantom({ status: 'done' })
-		})
-
-		MathJax.Hub.Startup.signal.Interest(function(msg) {
-		    callPhantom({ status: 'log',
-				  msg: "mathjax: startup: " + msg})
-		})
-		MathJax.Hub.signal.Interest(function(msg) {
-		    callPhantom({ status: 'log',
-				  msg: "mathjax: hub: " + msg})
-		})
-	    })
-	})
-    }
-
-    page.onCallback = function(data) {
-	if (data.status === "done") {
-	    page_filter(page, {mathjax_js: file})
-	    sys.stdout.write(page.content)
-	    if (conf.exit) exit(0)
-	} else {
-	    log(1, false, data.msg)
-	}
-    }
-}
-
-var page_filter = function(page, opt) {
-    conf.filters.forEach(function(name) {
-        log(1, false, "filter: %s", name)
-        var func = filters[name]
-        if (typeof func !== "function") errx("invalid filter name: %s", name)
-
-        if (!page.evaluate(function(func, opt) {
-            return func.call(this, opt)
-        }, func, opt)) {
-            log(1, false, "filter: %s: FAILED", name)
+// reject all external http(s) resources
+class MyResourceLoader extends jsdom.ResourceLoader {
+    fetch(url, opt) {
+        log(`<${opt.element.localName}>: ${url}`)
+        let u; try {
+            u = new URL(url)
+        } catch(e) {
+            return Promise.reject(e)
         }
-    })
-}
-
-var page_inject_mathjax_config = function(page) {
-    log(1, false, "page_inject_mathjax_config()")
-
-    if (typeof conf.mathjax.config === "function") {
-	page.evaluate(conf.mathjax.config)
-	return
+        if (u.protocol === "http:" || u.protocol === "https:")
+            return Promise.reject()
+        return super.fetch(url, opt)
     }
-
-    page.evaluateJavaScript(sprint('function(){ %s; }',
-				   fs.read(conf.mathjax.config)))
 }
 
+let options = {
+    config: {
+        short: 'c', type: 'string',
+        default: `${import.meta.dirname}/mathjax.conf.json`
+    },
+    version: { short: 'V', type: 'boolean' }
+}
 
-// Main
-
-var opt = parse_opt(sys.args)
-var input
+let params, mathjax_conf
 try {
-    input = opt.args[0] ? fs.read(opt.args[0]) : sys.stdin.read()
+    params = util.parseArgs({options})
+    mathjax_conf = JSON.parse(await read(params.values.config))
 } catch (e) {
-    errx(e)
+    console.error(e.message)
+    process.exit(1)
 }
 
-log(2, true, conf)
+if (params.values.version) {
+    console.log(await version())
+    process.exit(0)
+}
 
-render(input)
+let virtualConsole = new jsdom.VirtualConsole()
+virtualConsole.on("log", e => log('[console.log]', e))
+virtualConsole.on("error", e => log('[console.error]', e))
+virtualConsole.on("jsdomError", e => log('[JSDOM]', e.message))
+
+let html = await read()
+let dom = new JSDOM(html, {
+    url: `file://${import.meta.dirname}/`,
+    runScripts: 'dangerously',
+    resources: new MyResourceLoader(),
+    virtualConsole
+})
+
+dom.window.my_exit = function() {
+    log('Cleanup & serialize')
+    cleanup(dom.window.document)
+    console.log(dom.serialize())
+}
+
+dom.window.my_mathjax_conf = mathjax_conf
+
+let script = new Script(loader)
+let vmContext = dom.getInternalVMContext()
+script.runInContext(vmContext)

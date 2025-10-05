@@ -1,39 +1,39 @@
-let assert = require('assert/strict')
-let fs = require('fs')
-let spawnSync = require('child_process').spawnSync
+import assert from 'assert/strict'
+import fs from 'fs'
+import {spawnSync} from 'child_process'
 
-let cheerio = require('cheerio')
+import {JSDOM} from 'jsdom'
 
 suite('smoke', function() {
     setup(function() {
-	this.cmd = './mathjax-embed.js'
+        this.cmd = './mathjax-embed.js'
     })
 
     test('empty', function () {
-	let r = spawnSync(this.cmd,  [], {input: ''})
-	assert.equal('<html><head><style type="text/css">',
-		     r.stdout.toString().slice(0, 35))
-	assert.equal('</style></head><body></body></html>',
-		     r.stdout.toString().slice(-35))
+        let r = spawnSync(this.cmd,  [], {input: ''})
+        r = r.stdout.toString()
+        assert.equal(r.slice(0, 39), '<html><head><style id="MJX-SVG-styles">')
+        assert.equal( r.slice(-36), '</style></head><body></body></html>\n')
     })
 
     test('y=sin(x)', function () {
-	let r = spawnSync(this.cmd,  [], {input: '$y = \sin(x)$'})
-	let $ = cheerio.load(r.stdout.toString())
-        assert.equal(2, $('svg').length)
+        let r = spawnSync(this.cmd,  [], {input: '$y = \\sin(x)$'})
+        let dom = new JSDOM(r.stdout.toString())
+        let $ = dom.window.document.querySelectorAll.bind(dom.window.document)
+
+        assert.equal($('svg').length, 2)
         let scripts = $('script')
-        assert.equal(1, scripts.length)
-        assert.equal('MathJax-Element-1', $('script')[0].attribs.id)
-        assert(!$('script')[0].attribs.src)
+        assert.equal(scripts.length, 0)
     })
 
     test('example01.html', function () {
-	let r = spawnSync(this.cmd,  [], {
-	    input: fs.readFileSync('test/data/example01.html').toString()
-	})
-	let $ = cheerio.load(r.stdout.toString())
-        assert.equal(11, $('svg').length)
-        assert.equal(10, $('script').length)
-        assert.equal(10, $('script[type*="math/tex"]').length)
+        let r = spawnSync(this.cmd,  [], {
+            input: fs.readFileSync('test/data/example01.html').toString()
+        })
+        let dom = new JSDOM(r.stdout.toString())
+        let $ = dom.window.document.querySelectorAll.bind(dom.window.document)
+
+        assert.equal(14, $('svg').length)
+        assert.equal(0, $('script').length)
     })
 })

@@ -2,7 +2,7 @@ html		:= $(patsubst %.md, %.html, $(wildcard test/data/*.md))
 mathjax.html	:= $(patsubst %.html, %.mathjax.html, $(html))
 
 %.html: %.md		; pandoc -s $< -o $@ --mathjax
-%.mathjax.html: %.html	; ./mathjax-embed.js $< > $@
+%.mathjax.html: %.html	; ./mathjax-embed.js < $< > $@
 
 all: $(html) $(mathjax.html)
 clean:; rm $(mathjax.html) $(html)
