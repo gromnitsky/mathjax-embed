@@ -22,8 +22,8 @@ A markdown file with TeX formulas:
 In the default pandoc (3.8.1) configuration, the math delimiters are
 `$$...$$` for displayed mathematics, and `$...$` for in-line.
 
-See `mathjax.conf.json` for the default mathjax configuration. Use `-c
-file.json` option to provide your own.
+Run `mathjax-embed --config-print` to print the default mathjax
+configuration. Use `-c file.json` option to provide your own.
 
 ## Bugs
 

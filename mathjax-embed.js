@@ -4,6 +4,9 @@ import fs from 'fs'
 import { Script } from 'vm'
 import util from 'util'
 import os from 'os'
+import { createRequire } from 'module'
+let my_require = createRequire(import.meta.url)
+import path from 'path'
 import meta from './package.json' with { type: 'json' }
 
 import jsdom from 'jsdom'
@@ -32,10 +35,10 @@ function log(...args) { if (process.env.V) console.error(...args) }
 let loader = await read(`${import.meta.dirname}/loader.js`)
 
 function cleanup(document) {
-    let s = Array.from(document.querySelectorAll(`script[src*="node_modules"]`))
+    let s = Array.from(document.querySelectorAll(`script[src*="mathjax"]`))
     let pandoc = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
     if (pandoc) s.push(pandoc)
-    s.forEach( node => { node.parentNode.removeChild(node) })
+    s.forEach( node => { node?.parentNode?.removeChild(node) })
 }
 
 // reject all external http(s) resources
@@ -58,7 +61,8 @@ let options = {
         short: 'c', type: 'string',
         default: `${import.meta.dirname}/mathjax.conf.json`
     },
-    version: { short: 'V', type: 'boolean' }
+    version: { short: 'V', type: 'boolean' },
+    'config-print': { type: 'boolean' }
 }
 
 let params, mathjax_conf
@@ -75,14 +79,21 @@ if (params.values.version) {
     process.exit(0)
 }
 
+if (params.values['config-print']) {
+    console.log(JSON.stringify(mathjax_conf, null, 4))
+    process.exit(0)
+}
+
 let virtualConsole = new jsdom.VirtualConsole()
 virtualConsole.on("log", e => log('[console.log]', e))
 virtualConsole.on("error", e => log('[console.error]', e))
 virtualConsole.on("jsdomError", e => log('[JSDOM]', e.message))
 
 let html = await read()
+let base = path.dirname(path.dirname(my_require.resolve('mathjax')))
+log('base:', base)
 let dom = new JSDOM(html, {
-    url: `file://${import.meta.dirname}/`,
+    url: `file://${base}/`,
     runScripts: 'dangerously',
     resources: new MyResourceLoader(),
     virtualConsole

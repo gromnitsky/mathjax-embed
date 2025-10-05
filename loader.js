@@ -3,7 +3,7 @@
 // v4.0.0
 window.MathJax = {
     output: {
-        fontPath: 'node_modules/@mathjax/%%FONT%%-font'
+        fontPath: '@mathjax/%%FONT%%-font'
     },
     startup: {
         ready() {
@@ -17,7 +17,7 @@ Object.assign(window.MathJax, window.my_mathjax_conf)
 
 function main() {
     var script = document.createElement('script')
-    script.src = 'node_modules/mathjax/startup.js'
+    script.src = 'mathjax/startup.js'
     document.head.appendChild(script)
 }
 
