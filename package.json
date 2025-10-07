@@ -1,6 +1,6 @@
 {
     "name": "mathjax-embed",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "description": "Embed MathJax into HTML files as SVG",
     "author": "Alexander Gromnitsky <alexander.gromnitsky@gmail.com>",
     "repository": {

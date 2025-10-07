@@ -28,7 +28,7 @@ function read_async(file) {
 
 function version() {
     let v = n => JSON.parse(read(path.join(base, n, 'package.json'))).version
-    return util.format('%s/s (%s %s) mathjax/%s domjs/%s nodejs/%s',
+    return util.format('%s/%s (%s %s) mathjax/%s domjs/%s nodejs/%s',
                        meta.name, meta.version, os.type(), os.machine(),
                        v('mathjax'), v('jsdom'), process.version)
 }
