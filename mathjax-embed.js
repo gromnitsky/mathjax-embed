@@ -36,10 +36,8 @@ function version() {
 function log(...args) { if (process.env.V) console.error(...args) }
 
 function cleanup(document) {
-    let s = Array.from(document.querySelectorAll(`script[src*="mathjax"]`))
-    let pandoc = document.querySelector('script[src*="https://cdn.jsdelivr.net/npm/mathjax"]')
-    if (pandoc) s.push(pandoc)
-    s.forEach( node => { node.remove() })
+    document.querySelectorAll(`script[src*="mathjax"]`)
+        .forEach( node => { node.remove() })
 }
 
 // reject all external http(s) resources
