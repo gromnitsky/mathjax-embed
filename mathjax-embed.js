@@ -22,7 +22,7 @@ function read_async(file) {
     return new Promise( (resolve, reject) => {
         stream.on('error', reject)
         stream.on('data', chunk => data.push(chunk))
-        stream.on('end', () => resolve(data.join``))
+        stream.on('end', () => resolve(Buffer.concat(data)))
     })
 }
 
