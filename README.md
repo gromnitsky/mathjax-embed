@@ -6,7 +6,7 @@ JavaScript** to render itself.
 ~~~
 $ npm i -g mathjax-embed
 $ mathjax-embed -V
-mathjax-embed/s (2.0.0 Linux) mathjax/x86_64 domjs/4.0.0 nodejs/27.0.0 v22.20.0
+mathjax-embed/2.0.3 (Linux x86_64) mathjax/4.0.0 domjs/27.0.0 nodejs/v24.10.0
 ~~~
 
 ## Usage
